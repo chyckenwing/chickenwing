@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chickenwing"
+version = "0.1.0"
+description = "A fast, stylish YouTube downloader CLI powered by yt-dlp."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["yt-dlp>=2025.1.0"]
+authors = [
+  { name = "Chickenwing" }
+]
+keywords = ["youtube", "downloader", "yt-dlp", "cli", "audio", "video"]
+
+[project.urls]
+Homepage = "https://github.com/chyckenwing/chickenwing"
+Repository = "https://github.com/chyckenwing/chickenwing"
+Issues = "https://github.com/chyckenwing/chickenwing/issues"
+
+[project.scripts]
+chickenwing = "chickenwing.cli:main"
+wingit = "chickenwing.cli:main"
+
+[tool.setuptools]
+packages = ["chickenwing"]
+py-modules = ["yessir"]

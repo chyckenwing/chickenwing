@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local app output
+chickenwing.log
+download_archive.txt
+audio/
+videos/
+Videos/
+downloads/
+
+# Build artifacts
+build/
+dist/
+
+# Unrelated local tooling / caches
+node_modules/
+.tools/
+.sixth/
+magic/
+Music/
