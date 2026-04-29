@@ -75,6 +75,22 @@ Or create your own build locally:
 .\scripts\build-windows-exe.ps1
 ```
 
+## Tracking downloads
+
+For Windows `.exe` releases, GitHub already tracks release asset downloads.
+
+You can check them in two ways:
+
+```powershell
+py scripts\release-download-stats.py
+```
+
+Or from GitHub Actions:
+
+- run the `Release Download Stats` workflow
+
+This uses GitHub's release API download counts, so it tracks actual release asset downloads without adding hidden in-app telemetry.
+
 ## Usage
 
 - Paste a YouTube link to download the best video immediately.
