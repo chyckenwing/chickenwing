@@ -19,6 +19,7 @@ downloads/
 # Build artifacts
 build/
 dist/
+release/
 
 # Unrelated local tooling / caches
 node_modules/

@@ -14,6 +14,9 @@ authors = [
 ]
 keywords = ["youtube", "downloader", "yt-dlp", "cli", "audio", "video"]
 
+[project.optional-dependencies]
+build = ["pyinstaller>=6.20"]
+
 [project.urls]
 Homepage = "https://github.com/chyckenwing/chickenwing"
 Repository = "https://github.com/chyckenwing/chickenwing"

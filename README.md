@@ -55,6 +55,26 @@ Module form also works:
 py -m chickenwing
 ```
 
+## Windows `.exe`
+
+If you do not want to install Python, download the latest Windows build from GitHub Releases:
+
+- [Chickenwing Releases](https://github.com/chyckenwing/chickenwing/releases)
+
+Inside the release zip you will get a `chickenwing` folder that contains `chickenwing.exe`.
+
+Run it like this:
+
+```powershell
+.\chickenwing.exe
+```
+
+Or create your own build locally:
+
+```powershell
+.\scripts\build-windows-exe.ps1
+```
+
 ## Usage
 
 - Paste a YouTube link to download the best video immediately.
@@ -80,3 +100,5 @@ Inside that folder it keeps:
 ## ffmpeg
 
 For best audio extraction and video merging results, make sure `ffmpeg` is installed and available on `PATH`.
+
+The Windows `.exe` package does not bundle `ffmpeg` yet, so users still get the best experience when `ffmpeg` is already installed.
