@@ -118,3 +118,15 @@ Inside that folder it keeps:
 For best audio extraction and video merging results, make sure `ffmpeg` is installed and available on `PATH`.
 
 The Windows `.exe` package does not bundle `ffmpeg` yet, so users still get the best experience when `ffmpeg` is already installed.
+
+## WinGet
+
+Chickenwing is now prepared for WinGet packaging, but the command below only works after the package is accepted into the public WinGet community repository:
+
+```powershell
+winget install Chyckenwing.Chickenwing
+```
+
+Manifest generation and submission notes live here:
+
+- [docs/winget.md](docs/winget.md)
