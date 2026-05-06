@@ -15,6 +15,7 @@ But that only works after the package is accepted into the public WinGet communi
 - GitHub release asset exists
 - Windows `.exe` build pipeline exists
 - WinGet manifests can be generated from the latest release
+- generated installer manifests declare `Gyan.FFmpeg` as a dependency for Windows installs
 
 ## Generate manifests
 

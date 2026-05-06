@@ -73,6 +73,9 @@ Installers:
 - Architecture: x64
   InstallerUrl: {asset_url}
   InstallerSha256: {asset_sha256}
+  Dependencies:
+    PackageDependencies:
+    - PackageIdentifier: Gyan.FFmpeg
 ManifestType: installer
 ManifestVersion: {MANIFEST_VERSION}
 """

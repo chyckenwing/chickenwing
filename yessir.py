@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+from functools import lru_cache
 import os
 import re
 import shutil
@@ -255,7 +256,7 @@ class TerminalUI:
     def print_toolkit_ui(self, target_desc: str, config: SessionConfig) -> None:
         mode_name = "AUDIO (MP3)" if config.audio_only else "VIDEO"
         conc_name = ["SAFE", "FAST", "BEAST"][config.concurrency_level]
-        ffmpeg_name = "OK" if shutil.which("ffmpeg") else "MISSING"
+        ffmpeg_name = ffmpeg_status_label()
         archive_name = "ON" if config.archive_enabled else "OFF"
         output_name = str(AUDIO_DIR if config.audio_only else VIDEO_DIR)
 
@@ -502,6 +503,9 @@ class DownloaderEngine:
             "continue_dl": True,
             "restrictfilenames": True,
         }
+        ffmpeg_path = resolve_ffmpeg_executable()
+        if ffmpeg_path:
+            base_options["ffmpeg_location"] = str(ffmpeg_path)
         base_options.update(self._concurrency_options(config.concurrency_level))
 
         if playlist_items:
@@ -596,9 +600,12 @@ class DownloaderEngine:
         )
 
     def warn_if_ffmpeg_missing(self) -> None:
-        if shutil.which("ffmpeg") is None:
-            self.ui.warn("[!] ffmpeg not found in PATH. Audio/video post-processing may fail.")
-            self.ui.warn("    Install ffmpeg and make sure it is available on PATH.")
+        ffmpeg_path = resolve_ffmpeg_executable()
+        if ffmpeg_path is None:
+            self.ui.warn("[!] ffmpeg not found. Audio/video post-processing may fail.")
+            self.ui.warn("    Install ffmpeg or use the WinGet build that pulls it in automatically.")
+            return
+        self.ui.info(f"ffmpeg ready: {ffmpeg_source_label()} [{ffmpeg_path}]")
 
     @staticmethod
     def _concurrency_options(level: int) -> dict:
@@ -1145,6 +1152,53 @@ def format_time(seconds: object) -> str:
         return "??:??"
     minutes, remainder = divmod(total_seconds, 60)
     return f"{minutes}:{remainder:02d}"
+
+
+@lru_cache(maxsize=1)
+def resolve_ffmpeg_executable() -> Optional[Path]:
+    system_path = shutil.which("ffmpeg")
+    if system_path:
+        return Path(system_path)
+
+    winget_path = _find_winget_ffmpeg()
+    if winget_path:
+        return winget_path
+
+    return None
+
+
+def ffmpeg_status_label() -> str:
+    path = resolve_ffmpeg_executable()
+    if path is None:
+        return "MISSING"
+    source = ffmpeg_source_label()
+    return "OK" if source == "SYSTEM" else source
+
+
+def ffmpeg_source_label() -> str:
+    path = resolve_ffmpeg_executable()
+    if path is None:
+        return "MISSING"
+    normalized = str(path).lower()
+    if "winget\\packages" in normalized:
+        return "WINGET"
+    return "SYSTEM"
+
+
+def _find_winget_ffmpeg() -> Optional[Path]:
+    roots = [
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WinGet" / "Packages",
+        Path(os.environ.get("ProgramFiles", "")) / "WinGet" / "Packages",
+        Path(os.environ.get("ProgramFiles(x86)", "")) / "WinGet" / "Packages",
+    ]
+    for root in roots:
+        if not root.exists():
+            continue
+        for package_dir in sorted(root.glob("Gyan.FFmpeg*"), reverse=True):
+            candidates = sorted(package_dir.rglob("ffmpeg.exe"))
+            if candidates:
+                return candidates[0]
+    return None
 
 
 def is_playlist_url(url: str) -> bool:
