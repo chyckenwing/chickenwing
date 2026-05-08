@@ -70,6 +70,17 @@ class UserRequestedExit(Exception):
     """Raised when the user chooses to exit gracefully."""
 
 
+def configure_text_output() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            continue
+
+
 QUALITY_PRESETS = {
     "1": QualityPreset(
         code="1",
@@ -1399,6 +1410,7 @@ def get_video_url(video: dict) -> Optional[str]:
 
 
 def main() -> None:
+    configure_text_output()
     ChickenWingApp().run()
 
 

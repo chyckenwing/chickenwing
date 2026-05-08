@@ -47,7 +47,9 @@ def main() -> int:
     relative_exe = f"{asset_root}\\chickenwing.exe"
     release_date = str(release["published_at"]).split("T", 1)[0]
     release_notes = (
-        "Bundle ffmpeg into the Windows package so Chickenwing installs as a self-contained downloader."
+        "Handle Windows console encoding safely when video titles contain non-ASCII characters."
+        if version == "0.1.3"
+        else "Bundle ffmpeg into the Windows package so Chickenwing installs as a self-contained downloader."
         if version == "0.1.2"
         else f"Chickenwing Windows release {version}."
     )
