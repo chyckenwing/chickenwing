@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 import yt_dlp
+from chickenwing import __version__ as CHICKENWING_VERSION
 
 BASE_DOWNLOAD_DIR = Path.home() / "Downloads" / "Chickenwing Downloads"
 VIDEO_DIR = BASE_DOWNLOAD_DIR / "videos"
@@ -36,6 +37,15 @@ class DownloadTarget:
     source_text: str
     url: str
     is_playlist: bool
+
+
+@dataclass(frozen=True)
+class TargetPreview:
+    title: str
+    uploader: str
+    duration_text: str
+    kind_label: str
+    item_count: Optional[int] = None
 
 
 @dataclass
@@ -200,7 +210,7 @@ class TerminalUI:
 /_/ /_/_/\____/ .___/\__,_/\____/\____/\___/\__/\____/\____/\___(_)
                /_/
         """
-        print(self.color(banner + "CHICKEN WING BEAST MODE v2.0\n", "1;32"))
+        print(self.color(banner + f"CHICKEN WING BEAST MODE v{CHICKENWING_VERSION}\n", "1;32"))
         self.info("[*] Status: chickenwing online.\n")
 
     def print_rule(self, label: str = "") -> None:
@@ -233,9 +243,19 @@ class TerminalUI:
                 "Paste a YouTube link to download best video instantly.",
                 "Type search words to pick from the top 5 results.",
                 "Prefix with 'audio ' to download MP3.",
+                "Type 'history' to see recent files or 'where' to open the save path.",
                 "Press Enter or type 'quit' to exit.",
             ],
             accent="1;34",
+        )
+
+    def print_command_bar(self) -> None:
+        self.print_choice_list(
+            "Commands",
+            [
+                "help  settings  history  where  quit",
+            ],
+            accent="1;30",
         )
 
     def print_offline_message(self) -> None:
@@ -329,6 +349,33 @@ class TerminalUI:
             uploader = truncate_middle(video.get("uploader", "Unknown"), 20)
             print(self.color(f"  {index}. {title}", "1;34"))
             print(self.color(f"     {duration} | {uploader}", "1;30"))
+
+    def print_target_preview(self, target: DownloadTarget, preview: TargetPreview) -> None:
+        lines = [
+            f"TITLE    : {truncate_middle(preview.title, 74)}",
+            f"CHANNEL  : {truncate_middle(preview.uploader, 74)}",
+            f"TYPE     : {preview.kind_label}",
+            f"DURATION : {preview.duration_text}",
+        ]
+        if preview.item_count:
+            lines.append(f"ITEMS    : {preview.item_count}")
+        lines.append(f"URL      : {truncate_middle(target.url, 74)}")
+        self.print_choice_list("Target Preview", lines, accent="1;36")
+
+    def print_history(self, files: list[Path]) -> None:
+        self.print_rule("Recent Downloads")
+        if not files:
+            self.warn("  No recent downloads found yet.")
+            return
+        for index, file_path in enumerate(files, start=1):
+            try:
+                stamp = time.strftime("%Y-%m-%d %H:%M", time.localtime(file_path.stat().st_mtime))
+                size = format_bytes(file_path.stat().st_size)
+            except OSError:
+                stamp = "unknown time"
+                size = "0B"
+            line = f"{index}. {truncate_middle(file_path.name, 42)} | {size} | {stamp}"
+            print(self.color(f"  {line}", "1;34"))
 
     def print_settings_menu(self, config: SessionConfig) -> None:
         mode_name = "AUDIO" if config.audio_only else "VIDEO"
@@ -603,7 +650,7 @@ class DownloaderEngine:
         ffmpeg_path = resolve_ffmpeg_executable()
         if ffmpeg_path is None:
             self.ui.warn("[!] ffmpeg not found. Audio/video post-processing may fail.")
-            self.ui.warn("    Install ffmpeg or use the WinGet build that pulls it in automatically.")
+            self.ui.warn("    Install ffmpeg or use the bundled Windows release.")
             return
         self.ui.info(f"ffmpeg ready: {ffmpeg_source_label()} [{ffmpeg_path}]")
 
@@ -716,6 +763,7 @@ class ChickenWingApp:
             self.ui.print_banner()
             self.ui.info(f"Archive: {self.config.archive_path}")
             self.ui.print_quickstart()
+            self.ui.print_command_bar()
 
             while True:
                 raw = self.safe_input("Link or search: ")
@@ -726,6 +774,12 @@ class ChickenWingApp:
                     continue
                 if raw.lower() in {"settings", "config"}:
                     self.open_settings()
+                    continue
+                if raw.lower() in {"history", "recent"}:
+                    self.show_history()
+                    continue
+                if raw.lower() in {"where", "folder", "path"}:
+                    self.show_download_location()
                     continue
 
                 force_audio, target_text = self.parse_quick_input(raw)
@@ -770,8 +824,8 @@ class ChickenWingApp:
             self.ui.err("[X] No video selected")
             return
 
-        self.ui.print_rule("Target")
-        self.ui.info(f"Using: {target.url}")
+        self.show_session(target.url)
+        self.show_target_preview(target)
 
         playlist_items = None
         if target.is_playlist:
@@ -793,8 +847,8 @@ class ChickenWingApp:
                 self.ui.err("[X] Could not resolve target")
                 continue
 
-            self.ui.info(f"[->] Using: {target.url}")
-            self.ui.print_toolkit_ui(target.url, self.config)
+            self.show_session(target.url)
+            self.show_target_preview(target)
 
             playlist_items = None
             if target.is_playlist:
@@ -876,6 +930,41 @@ class ChickenWingApp:
                 self.ui.err(f"[X] Search error: {exc}")
             return []
 
+    def preview_target(self, target: DownloadTarget) -> Optional[TargetPreview]:
+        options = {
+            "quiet": True,
+            "skip_download": True,
+            "extract_flat": "in_playlist",
+        }
+        try:
+            with yt_dlp.YoutubeDL(options) as ydl:
+                info = ydl.extract_info(target.url, download=False)
+        except Exception as exc:
+            if DownloaderEngine._looks_like_network_error(exc):
+                self.ui.print_connection_drop_message()
+            else:
+                self.ui.warn(f"[!] Preview unavailable: {truncate_middle(str(exc), 72)}")
+            return None
+
+        if not info:
+            return None
+
+        kind_label = "playlist" if target.is_playlist else "video"
+        item_count = None
+        if target.is_playlist:
+            entries = info.get("entries") or []
+            item_count = len([entry for entry in entries if entry])
+        if info.get("_type") == "playlist":
+            kind_label = "playlist"
+
+        return TargetPreview(
+            title=info.get("title") or "Unknown title",
+            uploader=info.get("uploader") or info.get("channel") or info.get("creator") or "Unknown channel",
+            duration_text=format_time(info.get("duration")),
+            kind_label=kind_label.upper(),
+            item_count=item_count,
+        )
+
     def choose_video(self, results: list[dict]) -> Optional[str]:
         clean_results = [video for video in results if video]
         if not clean_results:
@@ -893,6 +982,14 @@ class ChickenWingApp:
                 if 1 <= selected <= len(clean_results):
                     return get_video_url(clean_results[selected - 1])
             self.ui.err("[X] Invalid choice")
+
+    def show_target_preview(self, target: DownloadTarget) -> None:
+        preview = self.preview_target(target)
+        if preview:
+            self.ui.print_target_preview(target, preview)
+            return
+        self.ui.print_rule("Target")
+        self.ui.info(f"Using: {target.url}")
 
     @staticmethod
     def parse_playlist_items(spec: str) -> Optional[str]:
@@ -956,6 +1053,16 @@ class ChickenWingApp:
 
     def show_session(self, target_desc: str) -> None:
         self.ui.print_toolkit_ui(target_desc, self.config)
+
+    def show_history(self) -> None:
+        files = self._recent_downloads(limit=8)
+        self.ui.print_history(files)
+        self.ui.info(f"Folder: {BASE_DOWNLOAD_DIR}")
+
+    def show_download_location(self) -> None:
+        self.ui.print_rule("Download Folder")
+        self.ui.info(str(BASE_DOWNLOAD_DIR))
+        self.ui.info("Videos and audio are kept there automatically.")
 
     def open_settings(self) -> None:
         while True:
@@ -1089,6 +1196,15 @@ class ChickenWingApp:
         else:
             self.ui.info("Archive: OFF")
 
+    @staticmethod
+    def _recent_downloads(limit: int = 8) -> list[Path]:
+        files: list[Path] = []
+        for folder in (VIDEO_DIR, AUDIO_DIR):
+            if not folder.exists():
+                continue
+            files.extend(path for path in folder.iterdir() if path.is_file())
+        return sorted(files, key=lambda path: path.stat().st_mtime, reverse=True)[:limit]
+
     def safe_input(self, prompt: str) -> str:
         while True:
             try:
@@ -1155,16 +1271,29 @@ def format_time(seconds: object) -> str:
 
 
 @lru_cache(maxsize=1)
-def resolve_ffmpeg_executable() -> Optional[Path]:
+def resolve_ffmpeg_directory() -> Optional[Path]:
+    bundled_dir = _find_bundled_ffmpeg_dir()
+    if bundled_dir:
+        return bundled_dir
+
     system_path = shutil.which("ffmpeg")
     if system_path:
-        return Path(system_path)
+        return Path(system_path).resolve().parent
 
     winget_path = _find_winget_ffmpeg()
     if winget_path:
         return winget_path
 
     return None
+
+
+@lru_cache(maxsize=1)
+def resolve_ffmpeg_executable() -> Optional[Path]:
+    ffmpeg_dir = resolve_ffmpeg_directory()
+    if ffmpeg_dir is None:
+        return None
+    candidate = ffmpeg_dir / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+    return candidate if candidate.exists() else None
 
 
 def ffmpeg_status_label() -> str:
@@ -1180,9 +1309,24 @@ def ffmpeg_source_label() -> str:
     if path is None:
         return "MISSING"
     normalized = str(path).lower()
+    if "\\ffmpeg\\bin\\ffmpeg.exe" in normalized or "/ffmpeg/bin/ffmpeg" in normalized:
+        return "BUNDLED"
     if "winget\\packages" in normalized:
         return "WINGET"
     return "SYSTEM"
+
+
+def _find_bundled_ffmpeg_dir() -> Optional[Path]:
+    candidate_dirs = []
+    if getattr(sys, "frozen", False):
+        candidate_dirs.append(Path(sys.executable).resolve().parent)
+    candidate_dirs.append(Path(__file__).resolve().parent)
+
+    for root in candidate_dirs:
+        ffmpeg_dir = root / "ffmpeg" / "bin"
+        if (ffmpeg_dir / "ffmpeg.exe").exists() or (ffmpeg_dir / "ffmpeg").exists():
+            return ffmpeg_dir
+    return None
 
 
 def _find_winget_ffmpeg() -> Optional[Path]:
@@ -1197,7 +1341,7 @@ def _find_winget_ffmpeg() -> Optional[Path]:
         for package_dir in sorted(root.glob("Gyan.FFmpeg*"), reverse=True):
             candidates = sorted(package_dir.rglob("ffmpeg.exe"))
             if candidates:
-                return candidates[0]
+                return candidates[0].parent
     return None
 
 

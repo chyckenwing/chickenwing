@@ -46,6 +46,11 @@ def main() -> int:
     asset_root = asset_name.removesuffix(".zip")
     relative_exe = f"{asset_root}\\chickenwing.exe"
     release_date = str(release["published_at"]).split("T", 1)[0]
+    release_notes = (
+        "Bundle ffmpeg into the Windows package so Chickenwing installs as a self-contained downloader."
+        if version == "0.1.2"
+        else f"Chickenwing Windows release {version}."
+    )
 
     target_dir = PACKAGE_ROOT / version
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -73,9 +78,6 @@ Installers:
 - Architecture: x64
   InstallerUrl: {asset_url}
   InstallerSha256: {asset_sha256}
-  Dependencies:
-    PackageDependencies:
-    - PackageIdentifier: Gyan.FFmpeg
 ManifestType: installer
 ManifestVersion: {MANIFEST_VERSION}
 """
@@ -103,7 +105,7 @@ Tags:
 - audio
 - video
 - cli
-ReleaseNotes: First public Windows release of Chickenwing.
+ReleaseNotes: {release_notes}
 ReleaseNotesUrl: https://github.com/chyckenwing/chickenwing/releases/tag/v{version}
 ManifestType: defaultLocale
 ManifestVersion: {MANIFEST_VERSION}
